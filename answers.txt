@@ -1,0 +1,38 @@
+SE3082 - Parallel Computing
+Lab Sheet 9 - Introduction to CUDA
+
+Student ID: <your student ID>
+Name: <your name>
+
+
+Exercise 2
+
+1. Why do we need separate variables d_a, d_b, d_c on the device? Why can the kernel not use a, b, c directly?
+The CPU (host) and the GPU (device) have separate memories. The kernel runs on the GPU and can only access GPU memory, so it cannot see a, b, c, which live in CPU memory. We allocate d_a, d_b, d_c in GPU memory with cudaMalloc and copy the values across with cudaMemcpy.
+
+2. In cudaMemcpy(d_a, &a, ...) we pass &a, but in the kernel launch we pass d_a. Why?
+a is a normal CPU variable, so &a (its address) tells cudaMemcpy where to copy from. d_a is already a pointer to GPU memory, and the kernel takes pointers (int *a), so d_a is passed as it is.
+
+3. How many threads run the add kernel? What would you change to run it with 10 threads, and would the answer change?
+One thread, because <<<1, 1>>> means 1 block of 1 thread. To run 10 threads, change the launch to <<<1, 10>>>. The answer would not change (still 9), because all 10 threads would do the same addition and write the same value to the same place.
+
+
+Exercise 3
+
+How many blocks and how many threads in total does add<<<N, 1>>> launch? What does a warp of 32 mean for a block that contains only one thread?
+It launches 512 blocks x 1 thread = 512 threads in total. A GPU executes threads in groups of 32 called warps, so a block with only one thread still occupies a whole warp, with 31 of the 32 slots idle. This wastes most of the GPU's capacity.
+
+
+Exercise 4
+
+Change N to 2048. What is printed, which part of the program told you, and which limit of the GPU did you hit?
+Printed: "Kernel launch failed: invalid argument". Every result was 0 and the last line was "Verification: 2048 mismatches out of 2048".
+The cudaGetLastError() check right after the kernel launch told me.
+The limit hit: a block can contain at most 1024 threads, and <<<1, 2048>>> asks for 2048 threads in one block, so the launch was refused.
+N was changed back to 512 afterwards.
+
+
+Exercise 5
+
+Why is it a good idea to use a multiple of 32 for the threads per block? What happens to the total number of threads launched if you use 500 instead of 512?
+The GPU runs threads in warps of 32. With a multiple of 32 every warp is full, so no thread slots are wasted. With 500 threads per block, the last warp of each block is only partly used (500 = 15.6 warps), so some slots are idle. The number of blocks becomes (10,000,000 + 499) / 500 = 20,000, so the total threads launched is 20,000 x 500 = 10,000,000 (instead of 19,532 x 512 = 10,000,384).
